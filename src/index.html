@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>〇×ゲーム</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <main class="game">
+    <h1>〇×ゲーム</h1>
+    <p id="status" class="status">プレイヤー O の番です</p>
+
+    <div id="board" class="board" aria-label="3×3のマス">
+      <button class="cell" data-index="0" aria-label="1つ目のマス"></button>
+      <button class="cell" data-index="1" aria-label="2つ目のマス"></button>
+      <button class="cell" data-index="2" aria-label="3つ目のマス"></button>
+      <button class="cell" data-index="3" aria-label="4つ目のマス"></button>
+      <button class="cell" data-index="4" aria-label="5つ目のマス"></button>
+      <button class="cell" data-index="5" aria-label="6つ目のマス"></button>
+      <button class="cell" data-index="6" aria-label="7つ目のマス"></button>
+      <button class="cell" data-index="7" aria-label="8つ目のマス"></button>
+      <button class="cell" data-index="8" aria-label="9つ目のマス"></button>
+    </div>
+
+    <button id="reset" class="reset-btn">リセット</button>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>
