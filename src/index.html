@@ -9,9 +9,10 @@
 <body>
   <main class="game">
     <h1>〇×ゲーム</h1>
-    <p id="status" class="status">プレイヤー O の番です</p>
+    <!-- aria-live でスクリーンリーダーに通知されるようにします -->
+    <p id="status" class="status" role="status" aria-live="polite">プレイヤー O の番です</p>
 
-    <div id="board" class="board" aria-label="3×3のマス">
+    <div id="board" class="board" role="grid" aria-label="3×3のマス">
       <button class="cell" data-index="0" aria-label="1つ目のマス"></button>
       <button class="cell" data-index="1" aria-label="2つ目のマス"></button>
       <button class="cell" data-index="2" aria-label="3つ目のマス"></button>
