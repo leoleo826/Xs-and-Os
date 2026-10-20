@@ -9,22 +9,27 @@
 <body>
   <main class="game">
     <h1>〇×ゲーム</h1>
-    <!-- aria-live でスクリーンリーダーに通知されるようにします -->
+
+    <div class="mode-switch" aria-label="対戦モード選択">
+      <button class="mode-btn active" data-mode="pvp" type="button">2人対戦</button>
+      <button class="mode-btn" data-mode="cpu" type="button">CPU対戦</button>
+    </div>
+
     <p id="status" class="status" role="status" aria-live="polite">プレイヤー O の番です</p>
 
     <div id="board" class="board" role="grid" aria-label="3×3のマス">
-      <button class="cell" data-index="0" aria-label="1つ目のマス"></button>
-      <button class="cell" data-index="1" aria-label="2つ目のマス"></button>
-      <button class="cell" data-index="2" aria-label="3つ目のマス"></button>
-      <button class="cell" data-index="3" aria-label="4つ目のマス"></button>
-      <button class="cell" data-index="4" aria-label="5つ目のマス"></button>
-      <button class="cell" data-index="5" aria-label="6つ目のマス"></button>
-      <button class="cell" data-index="6" aria-label="7つ目のマス"></button>
-      <button class="cell" data-index="7" aria-label="8つ目のマス"></button>
-      <button class="cell" data-index="8" aria-label="9つ目のマス"></button>
+      <button class="cell" data-index="0" aria-label="1つ目のマス" type="button"></button>
+      <button class="cell" data-index="1" aria-label="2つ目のマス" type="button"></button>
+      <button class="cell" data-index="2" aria-label="3つ目のマス" type="button"></button>
+      <button class="cell" data-index="3" aria-label="4つ目のマス" type="button"></button>
+      <button class="cell" data-index="4" aria-label="5つ目のマス" type="button"></button>
+      <button class="cell" data-index="5" aria-label="6つ目のマス" type="button"></button>
+      <button class="cell" data-index="6" aria-label="7つ目のマス" type="button"></button>
+      <button class="cell" data-index="7" aria-label="8つ目のマス" type="button"></button>
+      <button class="cell" data-index="8" aria-label="9つ目のマス" type="button"></button>
     </div>
 
-    <button id="reset" class="reset-btn">リセット</button>
+    <button id="reset" class="reset-btn" type="button">リセット</button>
   </main>
 
   <script src="./script.js"></script>
