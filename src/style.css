@@ -8,6 +8,7 @@
   --o-color: #ff6b6b;
   --x-color: #4dabf7;
   --empty: #eef4ff;
+  --win-glow: rgba(59, 130, 246, 0.2);
 }
 
 * {
@@ -39,6 +40,30 @@ h1 {
   font-size: clamp(2rem, 5vw, 2.5rem);
 }
 
+.mode-switch {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mode-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f8ff;
+  color: var(--text);
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
 .status {
   margin: 0 0 18px;
   font-size: 1.05rem;
@@ -64,9 +89,10 @@ h1 {
   color: var(--text);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-/* フォーカスの可視化: キーボードユーザーが現在どのセルにフォーカスしているか分かるようにする */
 .cell:focus {
   outline: 3px solid rgba(59,130,246,0.18);
   outline-offset: 3px;
@@ -90,11 +116,20 @@ h1 {
   color: var(--x-color);
 }
 
-/* 勝利パターンの強調表示 */
 .cell.win {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(59,130,246,0.06));
+  animation: winPulse 0.7s ease-in-out infinite alternate;
   border-color: var(--primary);
-  box-shadow: 0 8px 18px rgba(59,130,246,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(59,130,246,0.12));
+  box-shadow: 0 0 0 4px var(--win-glow);
+}
+
+@keyframes winPulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.07);
+  }
 }
 
 .reset-btn {
