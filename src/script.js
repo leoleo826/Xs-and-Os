@@ -17,6 +17,7 @@ const scoreEls = {
 
 const STORAGE_KEY = 'tictactoe-history-v1';
 
+// 3つ並ぶ可能なすべての勝利パターン
 const WIN_PATTERNS = [
   [0, 1, 2],
   [3, 4, 5],
@@ -39,6 +40,9 @@ let humanMark = 'X';
 let cpuMark = 'O';
 let audioCtx = null;
 
+// --------------------------------------------------------
+// 永続化: localStorage から勝敗履歴とスコアを復元
+// --------------------------------------------------------
 function loadPersistentState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -56,6 +60,9 @@ function loadPersistentState() {
   }
 }
 
+// --------------------------------------------------------
+// 永続化: 勝敗履歴とスコアを localStorage に保存
+// --------------------------------------------------------
 function savePersistentState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ score, history }));
@@ -64,6 +71,10 @@ function savePersistentState() {
   }
 }
 
+// --------------------------------------------------------
+// 音声効果の初期化
+// Web Audio API を使って簡易的な効果音を再生
+// --------------------------------------------------------
 function initAudio() {
   const AudioCtor = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtor) return;
@@ -105,6 +116,9 @@ function playDrawSound() {
   playTone(350, 0.2, 'sawtooth', 0.04);
 }
 
+// --------------------------------------------------------
+// UI 表示系
+// --------------------------------------------------------
 function setStatus(text) {
   statusEl.textContent = text;
 }
@@ -141,6 +155,9 @@ function addHistory(entry) {
   renderHistory();
 }
 
+// --------------------------------------------------------
+// 基本ロジック
+// --------------------------------------------------------
 function findWinningPattern(mark, boardState = board) {
   for (const pattern of WIN_PATTERNS) {
     if (pattern.every(index => boardState[index] === mark)) {
@@ -160,6 +177,9 @@ function getAvailableMoves(boardState = board) {
     .filter(value => value !== null);
 }
 
+// --------------------------------------------------------
+// 勝利セルのハイライト
+// --------------------------------------------------------
 function clearWinHighlight() {
   cells.forEach(cell => cell.classList.remove('win'));
 }
@@ -171,6 +191,9 @@ function animateWin(pattern) {
   });
 }
 
+// --------------------------------------------------------
+// マスに印を付ける/外す
+// --------------------------------------------------------
 function addMarkToCell(index, mark) {
   const cell = cells[index];
   cell.textContent = mark;
@@ -178,6 +201,21 @@ function addMarkToCell(index, mark) {
   cell.disabled = true;
 }
 
+function clearCell(index) {
+  const cell = cells[index];
+  cell.textContent = '';
+  cell.classList.remove('o', 'x');
+  cell.disabled = false;
+}
+
+// --------------------------------------------------------
+// 厳密な強制引き分け判定
+// ルール:
+// - あるラインに相手のマークが含まれている場合、そのラインは勝てない
+// - 自分のマークのみ、または空欄が残っていても、空欄が 1 つ以上あるなら
+//   そのラインは「まだ勝てる可能性がある」
+// - O も X も、どちらも勝利可能ラインが 1 つもない場合は強制引き分け
+// --------------------------------------------------------
 function canPlayerStillWin(mark) {
   return WIN_PATTERNS.some(pattern => {
     const cellsInLine = pattern.map(index => board[index]);
@@ -194,6 +232,9 @@ function isForcedDraw() {
   return !canPlayerStillWin('O') && !canPlayerStillWin('X');
 }
 
+// --------------------------------------------------------
+// CPU の思考ロジック
+// --------------------------------------------------------
 function findImmediateWinningMove(mark, boardState = board) {
   const available = getAvailableMoves(boardState);
 
@@ -247,21 +288,26 @@ function getCpuMove() {
   }
 
   if (difficulty === 'normal') {
+    // 1. すぐ勝てる手があれば選ぶ
     const winningMove = findImmediateWinningMove(cpuMark);
     if (winningMove !== null) return winningMove;
 
+    // 2. 相手の一手先勝ちを防ぐ
     const opponentMark = cpuMark === 'O' ? 'X' : 'O';
     const blockMove = findImmediateWinningMove(opponentMark);
     if (blockMove !== null) return blockMove;
 
+    // 3. 中央を優先
     if (available.includes(4)) return 4;
 
+    // 4. 角を優先
     const corners = [0, 2, 6, 8].filter(index => available.includes(index));
     if (corners.length > 0) return corners[0];
 
     return available[0];
   }
 
+  // Hard: minimaxで最善手を計算
   let bestScore = -Infinity;
   let bestMove = available[0];
   const opponentMark = cpuMark === 'O' ? 'X' : 'O';
@@ -279,6 +325,9 @@ function getCpuMove() {
   return bestMove;
 }
 
+// --------------------------------------------------------
+// ゲーム状態のリセットと進行
+// --------------------------------------------------------
 function disableAll() {
   cells.forEach(cell => cell.disabled = true);
 }
@@ -353,6 +402,11 @@ function finalizeRound(message) {
   savePersistentState();
 }
 
+// --------------------------------------------------------
+// 置く処理の本体
+// - 4つ目入力の削除ルールは廃止
+// - 3つ並べられない状態なら強制引き分け
+// --------------------------------------------------------
 function placeMark(index, mark) {
   if (gameOver || board[index]) return;
 
@@ -372,6 +426,8 @@ function placeMark(index, mark) {
     return;
   }
 
+  // 4つ目入力時の削除ルールは廃止
+  // 代わりに、どちらも 3 つ揃えられなくなった場合に強制引き分け
   if (isForcedDraw()) {
     score.draw += 1;
     renderScoreboard();
