@@ -234,6 +234,20 @@ h1 {
   transition: background 0.2s ease, transform 0.15s ease;
 }
 
+.forced-draw-note {
+  margin: 8px 0 16px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: #fff4d6;
+  color: #7a5600;
+  border: 1px solid #f5d98b;
+}
+
+.forced-draw-note.hidden {
+  display: none;
+}
 .reset-btn:hover {
   background: var(--primary-dark);
   transform: translateY(-1px);
