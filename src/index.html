@@ -16,18 +16,30 @@
     </div>
 
     <div class="toolbar" aria-label="設定">
-      <label for="difficulty">難易度</label>
-      <select id="difficulty" aria-label="難易度">
-        <option value="easy">Easy</option>
-        <option value="normal" selected>Normal</option>
-        <option value="hard">Hard</option>
-      </select>
+      <div class="field">
+        <label for="difficulty">難易度</label>
+        <select id="difficulty" aria-label="難易度">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
 
-      <label for="start-player">先攻</label>
-      <select id="start-player" aria-label="先攻選択">
-        <option value="O" selected>O</option>
-        <option value="X">X</option>
-      </select>
+      <div class="field">
+        <label for="start-player">先攻</label>
+        <select id="start-player" aria-label="先攻選択">
+          <option value="O" selected>O</option>
+          <option value="X">X</option>
+        </select>
+      </div>
+
+      <div id="cpu-mark-container" class="field hidden">
+        <label for="human-mark">あなたのマーク</label>
+        <select id="human-mark" aria-label="あなたのマーク選択">
+          <option value="X" selected>X</option>
+          <option value="O">O</option>
+        </select>
+      </div>
     </div>
 
     <div class="scoreboard">
@@ -45,7 +57,10 @@
       </div>
     </div>
 
-
+    <div class="history-panel">
+      <h2>勝敗履歴</h2>
+      <ul id="history-list"></ul>
+    </div>
 
     <p id="status" class="status" role="status" aria-live="polite">プレイヤー O の番です</p>
 
@@ -62,12 +77,6 @@
     </div>
 
     <button id="reset" class="reset-btn" type="button">リセット</button>
-
-        <div class="history-panel">
-      <h2>勝敗履歴</h2>
-      <ul id="history-list"></ul>
-    </div>
-    
   </main>
 
   <script src="./script.js"></script>
