@@ -7,6 +7,7 @@ const startPlayerSelect = document.getElementById('start-player');
 const humanMarkSelect = document.getElementById('human-mark');
 const cpuMarkContainer = document.getElementById('cpu-mark-container');
 const historyList = document.getElementById('history-list');
+const forcedDrawNoteEl = document.getElementById('forced-draw-note');
 
 const scoreEls = {
   O: document.getElementById('score-o'),
@@ -28,7 +29,6 @@ const WIN_PATTERNS = [
 ];
 
 let board = Array(9).fill('');
-let moves = { O: [], X: [] };
 let currentPlayer = 'O';
 let gameOver = false;
 let gameMode = 'pvp';
@@ -109,6 +109,16 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function showForcedDrawNote(show, text = '') {
+  if (show) {
+    forcedDrawNoteEl.textContent = text;
+    forcedDrawNoteEl.classList.remove('hidden');
+  } else {
+    forcedDrawNoteEl.textContent = '';
+    forcedDrawNoteEl.classList.add('hidden');
+  }
+}
+
 function renderScoreboard() {
   scoreEls.O.textContent = String(score.O);
   scoreEls.X.textContent = String(score.X);
@@ -168,20 +178,20 @@ function addMarkToCell(index, mark) {
   cell.disabled = true;
 }
 
-function removeMarkFromCell(index) {
-  const cell = cells[index];
-  cell.textContent = '';
-  cell.classList.remove('o', 'x');
-  cell.disabled = false;
+function canPlayerStillWin(mark) {
+  return WIN_PATTERNS.some(pattern => {
+    const cellsInLine = pattern.map(index => board[index]);
+    const hasOpponent = cellsInLine.some(value => value !== '' && value !== mark);
+
+    if (hasOpponent) return false;
+
+    const emptyCount = cellsInLine.filter(value => value === '').length;
+    return emptyCount > 0;
+  });
 }
 
-function removeOldestMove(mark) {
-  if (moves[mark].length === 0) return null;
-
-  const oldest = moves[mark].shift();
-  board[oldest] = '';
-  removeMarkFromCell(oldest);
-  return oldest;
+function isForcedDraw() {
+  return !canPlayerStillWin('O') && !canPlayerStillWin('X');
 }
 
 function findImmediateWinningMove(mark, boardState = board) {
@@ -260,7 +270,6 @@ function getCpuMove() {
     board[move] = cpuMark;
     const score = minimax(board, 0, false, cpuMark, opponentMark);
     board[move] = '';
-
     if (score > bestScore) {
       bestScore = score;
       bestMove = move;
@@ -297,14 +306,15 @@ function syncCpuMarks() {
 
   const chosenHumanMark = humanMarkSelect.value;
   humanMark = chosenHumanMark;
-  cpuMark = chosenHumanMark === 'X' ? 'O' : 'X';
+  cpuMark = humanMark === 'X' ? 'O' : 'X';
 }
 
 function resetBoard() {
   board = Array(9).fill('');
-  moves = { O: [], X: [] };
+  currentPlayer = 'O';
   gameOver = false;
   clearWinHighlight();
+  showForcedDrawNote(false);
 
   cells.forEach(cell => {
     cell.textContent = '';
@@ -347,7 +357,6 @@ function placeMark(index, mark) {
   if (gameOver || board[index]) return;
 
   board[index] = mark;
-  moves[mark].push(index);
   addMarkToCell(index, mark);
   playMoveSound();
 
@@ -358,27 +367,18 @@ function placeMark(index, mark) {
     renderScoreboard();
     addHistory(`${mark} 勝ち`);
     playWinSound();
+    showForcedDrawNote(false);
     finalizeRound(`プレイヤー ${mark} の勝ちです！`);
     return;
   }
 
-  if (moves[mark].length >= 4) {
-    const removed = removeOldestMove(mark);
-    const nextPlayer = mark === 'O' ? 'X' : 'O';
-
-    setStatus(
-      `プレイヤー ${mark} が4つ目を入力したため、最初の入力（セル ${removed + 1}）が消えました。次はプレイヤー ${nextPlayer} の番です`
-    );
-    currentPlayer = nextPlayer;
-
-    if (gameMode === 'cpu' && currentPlayer === cpuMark) {
-      setTimeout(() => {
-        if (!gameOver) {
-          const cpuMove = getCpuMove();
-          placeMark(cpuMove, cpuMark);
-        }
-      }, 450);
-    }
+  if (isForcedDraw()) {
+    score.draw += 1;
+    renderScoreboard();
+    addHistory('強制引き分け');
+    playDrawSound();
+    showForcedDrawNote(true, 'どちらも 3 つ並べる余地がないため引き分けです');
+    finalizeRound('どちらも 3 つ並べる余地がないため引き分けです');
     return;
   }
 
@@ -387,6 +387,7 @@ function placeMark(index, mark) {
     renderScoreboard();
     addHistory('引き分け');
     playDrawSound();
+    showForcedDrawNote(false);
     finalizeRound('引き分けです');
     return;
   }
