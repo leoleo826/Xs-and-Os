@@ -15,6 +15,15 @@
       <button class="mode-btn" data-mode="cpu" type="button">CPU対戦</button>
     </div>
 
+    <div class="toolbar" aria-label="難易度設定">
+      <label for="difficulty">難易度</label>
+      <select id="difficulty" aria-label="難易度">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
+
     <p id="status" class="status" role="status" aria-live="polite">プレイヤー O の番です</p>
 
     <div id="board" class="board" role="grid" aria-label="3×3のマス">
