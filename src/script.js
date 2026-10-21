@@ -1,225 +1,404 @@
-:root {
-  --bg: #f5f7fb;
-  --panel: #ffffff;
-  --line: #dfe7f3;
-  --text: #1f2937;
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --o-color: #ff6b6b;
-  --x-color: #4dabf7;
-  --empty: #eef4ff;
-  --win-glow: rgba(59, 130, 246, 0.2);
+const cells = [...document.querySelectorAll('.cell')];
+const statusEl = document.getElementById('status');
+const resetBtn = document.getElementById('reset');
+const modeButtons = [...document.querySelectorAll('.mode-btn')];
+const difficultySelect = document.getElementById('difficulty');
+const startPlayerSelect = document.getElementById('start-player');
+const historyList = document.getElementById('history-list');
+
+const scoreEls = {
+  O: document.getElementById('score-o'),
+  X: document.getElementById('score-x'),
+  draw: document.getElementById('score-draw')
+};
+
+const WIN_PATTERNS = [
+  [0, 1, 2],
+  [3, 4, 5],
+  [6, 7, 8],
+  [0, 3, 6],
+  [1, 4, 7],
+  [2, 5, 8],
+  [0, 4, 8],
+  [2, 4, 6]
+];
+
+let board = Array(9).fill('');
+let moves = { O: [], X: [] };
+let currentPlayer = 'O';
+let gameOver = false;
+let gameMode = 'pvp';
+let cpuMark = 'X';
+let difficulty = 'normal';
+let score = { O: 0, X: 0, draw: 0 };
+let history = [];
+
+let audioCtx = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtor) audioCtx = new AudioCtor();
+  }
 }
 
-* {
-  box-sizing: border-box;
+function playTone(frequency, duration = 0.12, type = 'square', volume = 0.04) {
+  if (!audioCtx) initAudio();
+  if (!audioCtx) return;
+
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.value = frequency;
+
+  gainNode.gain.value = volume;
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  const startTime = audioCtx.currentTime;
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration);
+
+  gainNode.gain.setValueAtTime(volume, startTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #eef4ff, #f8fbff);
-  font-family: "Segoe UI", "Yu Gothic", sans-serif;
-  color: var(--text);
+function playMoveSound() {
+  playTone(520, 0.08, 'square', 0.04);
 }
 
-.game {
-  width: min(90vw, 420px);
-  padding: 24px 20px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.12);
-  text-align: center;
+function playWinSound() {
+  playTone(780, 0.18, 'triangle', 0.06);
+  setTimeout(() => playTone(980, 0.18, 'triangle', 0.05), 120);
 }
 
-h1 {
-  margin: 0 0 12px;
-  font-size: clamp(2rem, 5vw, 2.5rem);
+function playDrawSound() {
+  playTone(350, 0.2, 'sawtooth', 0.04);
 }
 
-.mode-switch {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 14px;
+function updateStartPlayerOptions() {
+  if (gameMode === 'cpu') {
+    startPlayerSelect.innerHTML = `
+      <option value="human">あなた</option>
+      <option value="cpu">CPU</option>
+    `;
+    startPlayerSelect.value = 'human';
+  } else {
+    startPlayerSelect.innerHTML = `
+      <option value="O" selected>O</option>
+      <option value="X">X</option>
+    `;
+    startPlayerSelect.value = 'O';
+  }
 }
 
-.mode-btn {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #f4f8ff;
-  color: var(--text);
-  padding: 8px 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+function setStatus(text) {
+  statusEl.textContent = text;
 }
 
-.mode-btn.active {
-  background: var(--primary);
-  color: #fff;
-  border-color: var(--primary);
+function findWinningPattern(mark, boardState = board) {
+  for (const pattern of WIN_PATTERNS) {
+    if (pattern.every(index => boardState[index] === mark)) return pattern;
+  }
+  return null;
 }
 
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px 12px;
-  margin-bottom: 14px;
-  font-weight: 600;
+function isWinner(mark, boardState = board) {
+  return findWinningPattern(mark, boardState) !== null;
 }
 
-#difficulty,
-#start-player {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: #fff;
-  color: var(--text);
-  font-size: 0.95rem;
+function getAvailableMoves(boardState = board) {
+  return boardState
+    .map((value, index) => (value === '' ? index : null))
+    .filter(value => value !== null);
 }
 
-.scoreboard {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(70px, 1fr));
-  gap: 10px;
-  margin-bottom: 18px;
+function clearWinHighlight() {
+  cells.forEach(cell => cell.classList.remove('win'));
 }
 
-.score-box {
-  background: #f8fbff;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+function animateWin(pattern) {
+  pattern.forEach(index => {
+    const cell = cells[index];
+    cell.classList.add('win');
+  });
 }
 
-.score-box span {
-  font-size: 0.75rem;
-  color: #4b5563;
+function addMarkToCell(index, mark) {
+  const cell = cells[index];
+  cell.textContent = mark;
+  cell.classList.add(mark === 'O' ? 'o' : 'x');
+  cell.disabled = true;
 }
 
-.score-box strong {
-  font-size: 1.1rem;
+function removeMarkFromCell(index) {
+  const cell = cells[index];
+  cell.textContent = '';
+  cell.classList.remove('o', 'x');
+  cell.disabled = false;
 }
 
-.history-panel {
-  margin-bottom: 18px;
-  background: #f8fbff;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 10px;
+function removeOldestMove(mark) {
+  if (moves[mark].length === 0) return null;
+
+  const oldest = moves[mark].shift();
+  board[oldest] = '';
+  removeMarkFromCell(oldest);
+  return oldest;
 }
 
-.history-panel h2 {
-  margin: 0 0 8px;
-  font-size: 1rem;
+function findImmediateWinningMove(mark, boardState = board) {
+  const available = getAvailableMoves(boardState);
+
+  for (const index of available) {
+    boardState[index] = mark;
+    const pattern = findWinningPattern(mark, boardState);
+    boardState[index] = '';
+    if (pattern) return index;
+  }
+
+  return null;
 }
 
-#history-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 120px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+function minimax(boardState, depth, isMaximizing, aiMark, humanMark) {
+  const aiWin = findWinningPattern(aiMark, boardState);
+  const humanWin = findWinningPattern(humanMark, boardState);
+
+  if (aiWin) return 10 - depth;
+  if (humanWin) return depth - 10;
+
+  const available = getAvailableMoves(boardState);
+  if (available.length === 0) return 0;
+
+  if (isMaximizing) {
+    let bestScore = -Infinity;
+    for (const move of available) {
+      boardState[move] = aiMark;
+      const score = minimax(boardState, depth + 1, false, aiMark, humanMark);
+      boardState[move] = '';
+      bestScore = Math.max(bestScore, score);
+    }
+    return bestScore;
+  }
+
+  let bestScore = Infinity;
+  for (const move of available) {
+    boardState[move] = humanMark;
+    const score = minimax(boardState, depth + 1, true, aiMark, humanMark);
+    boardState[move] = '';
+    bestScore = Math.min(bestScore, score);
+  }
+  return bestScore;
 }
 
-#history-list li {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 8px;
-  text-align: left;
-  font-size: 0.85rem;
+function getCpuMove() {
+  const available = getAvailableMoves();
+
+  if (difficulty === 'easy') {
+    const randomIndex = Math.floor(Math.random() * available.length);
+    return available[randomIndex];
+  }
+
+  if (difficulty === 'normal') {
+    const winningMove = findImmediateWinningMove(cpuMark);
+    if (winningMove !== null) return winningMove;
+
+    const humanMark = cpuMark === 'O' ? 'X' : 'O';
+    const blockMove = findImmediateWinningMove(humanMark);
+    if (blockMove !== null) return blockMove;
+
+    if (available.includes(4)) return 4;
+
+    const corners = [0, 2, 6, 8].filter(index => available.includes(index));
+    if (corners.length > 0) return corners[0];
+
+    return available[0];
+  }
+
+  // Hard: minimax
+  let bestScore = -Infinity;
+  let bestMove = available[0];
+  const humanMark = cpuMark === 'O' ? 'X' : 'O';
+
+  for (const move of available) {
+    board[move] = cpuMark;
+    const score = minimax(board, 0, false, cpuMark, humanMark);
+    board[move] = '';
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  }
+
+  return bestMove;
 }
 
-.status {
-  margin: 0 0 18px;
-  font-size: 1.05rem;
-  font-weight: 600;
+function renderScoreboard() {
+  scoreEls.O.textContent = String(score.O);
+  scoreEls.X.textContent = String(score.X);
+  scoreEls.draw.textContent = String(score.draw);
 }
 
-.board {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(80px, 1fr));
-  gap: 10px;
-  margin: 0 auto 16px;
-  width: min(100%, 300px);
+function addHistory(text) {
+  const li = document.createElement('li');
+  li.textContent = text;
+  historyList.prepend(li);
+  if (historyList.children.length > 8) {
+    historyList.removeChild(historyList.lastChild);
+  }
 }
 
-.cell {
-  width: 100%;
-  aspect-ratio: 1;
-  font-size: clamp(2rem, 6vw, 3rem);
-  font-weight: 700;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--empty);
-  color: var(--text);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-  position: relative;
-  overflow: hidden;
+function resetBoard() {
+  board = Array(9).fill('');
+  moves = { O: [], X: [] };
+  currentPlayer = 'O';
+  gameOver = false;
+  clearWinHighlight();
+
+  cells.forEach(cell => {
+    cell.textContent = '';
+    cell.classList.remove('o', 'x', 'win');
+    cell.disabled = false;
+  });
+
+  if (gameMode === 'cpu') {
+    const selected = startPlayerSelect.value;
+    currentPlayer = selected === 'cpu' ? 'X' : 'O';
+    setStatus(currentPlayer === 'X' ? 'CPU の番です' : 'プレイヤー O の番です');
+
+    if (currentPlayer === 'X') {
+      setTimeout(() => {
+        if (!gameOver) {
+          const cpuMove = getCpuMove();
+          placeMark(cpuMove, 'X');
+        }
+      }, 400);
+    }
+    return;
+  }
+
+  const firstMark = startPlayerSelect.value;
+  currentPlayer = firstMark === 'X' ? 'X' : 'O';
+  setStatus(`プレイヤー ${currentPlayer} の番です`);
 }
 
-.cell:focus {
-  outline: 3px solid rgba(59,130,246,0.18);
-  outline-offset: 3px;
+function finalizeRound(resultText) {
+  setStatus(resultText);
+  gameOver = true;
+  disableAll();
 }
 
-.cell:hover:not(:disabled) {
-  transform: translateY(-2px);
-  border-color: var(--primary);
-  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.12);
+function disableAll() {
+  cells.forEach(cell => cell.disabled = true);
 }
 
-.cell:disabled {
-  cursor: default;
+function placeMark(index, mark) {
+  if (gameOver || board[index]) return;
+
+  board[index] = mark;
+  moves[mark].push(index);
+  addMarkToCell(index, mark);
+  playMoveSound();
+
+  const winningPattern = findWinningPattern(mark);
+  if (winningPattern) {
+    animateWin(winningPattern);
+    score[mark] += 1;
+    renderScoreboard();
+    addHistory(`${mark} 勝ち`);
+    playWinSound();
+    finalizeRound(`プレイヤー ${mark} の勝ちです！`);
+    return;
+  }
+
+  if (moves[mark].length >= 4) {
+    const removed = removeOldestMove(mark);
+    const nextPlayer = mark === 'O' ? 'X' : 'O';
+
+    setStatus(
+      `プレイヤー ${mark} が4つ目を入力したため、最初の入力（セル ${removed + 1}）が消えました。次はプレイヤー ${nextPlayer} の番です`
+    );
+    currentPlayer = nextPlayer;
+
+    if (gameMode === 'cpu' && currentPlayer === cpuMark) {
+      setTimeout(() => {
+        if (!gameOver) {
+          const cpuMove = getCpuMove();
+          placeMark(cpuMove, cpuMark);
+        }
+      }, 450);
+    }
+    return;
+  }
+
+  if (board.filter(Boolean).length === 9) {
+    score.draw += 1;
+    renderScoreboard();
+    addHistory('引き分け');
+    playDrawSound();
+    finalizeRound('引き分けです');
+    return;
+  }
+
+  currentPlayer = mark === 'O' ? 'X' : 'O';
+
+  if (gameMode === 'cpu' && currentPlayer === cpuMark) {
+    setStatus('CPU の番です');
+    setTimeout(() => {
+      if (!gameOver) {
+        const cpuMove = getCpuMove();
+        placeMark(cpuMove, cpuMark);
+      }
+    }, 500);
+    return;
+  }
+
+  setStatus(`プレイヤー ${currentPlayer} の番です`);
 }
 
-.cell.o {
-  color: var(--o-color);
+function handleCellClick(event) {
+  const cell = event.currentTarget;
+  const idx = Number(cell.dataset.index);
+
+  if (gameOver || board[idx]) return;
+
+  if (gameMode === 'cpu' && currentPlayer === cpuMark) return;
+
+  placeMark(idx, currentPlayer);
 }
 
-.cell.x {
-  color: var(--x-color);
+function setMode(nextMode) {
+  gameMode = nextMode;
+  cpuMark = 'X';
+
+  updateStartPlayerOptions();
+  resetBoard();
 }
 
-.cell.win {
-  animation: winPulse 0.7s ease-in-out infinite alternate;
-  border-color: var(--primary);
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(59,130,246,0.12));
-  box-shadow: 0 0 0 4px var(--win-glow);
+function onDifficultyChange(event) {
+  difficulty = event.target.value;
+  resetBoard();
 }
 
-@keyframes winPulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.07); }
+function onStartPlayerChange() {
+  resetBoard();
 }
 
-.reset-btn {
-  padding: 12px 18px;
-  border: none;
-  border-radius: 10px;
-  background: var(--primary);
-  color: white;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.15s ease;
-}
+modeButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    modeButtons.forEach(btn => btn.classList.toggle('active', btn === button));
+    setMode(button.dataset.mode);
+  });
+});
 
-.reset-btn:hover {
-  background: var(--primary-dark);
-  transform: translateY(-1px);
-}
+difficultySelect.addEventListener('change', onDifficultyChange);
+startPlayerSelect.addEventListener('change', onStartPlayerChange);
+
+cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+resetBtn.addEventListener('click', resetBoard);
+
+renderScoreboard();
+updateStartPlayerOptions();
+resetBoard();
