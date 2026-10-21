@@ -1,293 +1,225 @@
-const cells = [...document.querySelectorAll('.cell')];
-const statusEl = document.getElementById('status');
-const resetBtn = document.getElementById('reset');
-const modeButtons = [...document.querySelectorAll('.mode-btn')];
-const difficultySelect = document.getElementById('difficulty');
-
-const WIN_PATTERNS = [
-  [0, 1, 2],
-  [3, 4, 5],
-  [6, 7, 8],
-  [0, 3, 6],
-  [1, 4, 7],
-  [2, 5, 8],
-  [0, 4, 8],
-  [2, 4, 6]
-];
-
-let board = Array(9).fill('');
-let moves = { O: [], X: [] };
-let currentPlayer = 'O';
-let gameOver = false;
-let gameMode = 'pvp';
-let cpuMark = 'X';
-let difficulty = 'normal';
-
-function setStatus(text) {
-  statusEl.textContent = text;
+:root {
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --line: #dfe7f3;
+  --text: #1f2937;
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --o-color: #ff6b6b;
+  --x-color: #4dabf7;
+  --empty: #eef4ff;
+  --win-glow: rgba(59, 130, 246, 0.2);
 }
 
-function findWinningPattern(mark, boardState = board) {
-  for (const pattern of WIN_PATTERNS) {
-    if (pattern.every(index => boardState[index] === mark)) {
-      return pattern;
-    }
-  }
-  return null;
+* {
+  box-sizing: border-box;
 }
 
-function isWinner(mark, boardState = board) {
-  return findWinningPattern(mark, boardState) !== null;
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #eef4ff, #f8fbff);
+  font-family: "Segoe UI", "Yu Gothic", sans-serif;
+  color: var(--text);
 }
 
-function getAvailableMoves(boardState = board) {
-  return boardState
-    .map((value, index) => (value === '' ? index : null))
-    .filter(value => value !== null);
+.game {
+  width: min(90vw, 420px);
+  padding: 24px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.12);
+  text-align: center;
 }
 
-function clearWinHighlight() {
-  cells.forEach(cell => cell.classList.remove('win'));
+h1 {
+  margin: 0 0 12px;
+  font-size: clamp(2rem, 5vw, 2.5rem);
 }
 
-function animateWin(pattern) {
-  pattern.forEach(index => {
-    const cell = cells[index];
-    cell.classList.add('win');
-  });
+.mode-switch {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-function addMarkToCell(index, mark) {
-  const cell = cells[index];
-  cell.textContent = mark;
-  cell.classList.add(mark === 'O' ? 'o' : 'x');
-  cell.disabled = true;
+.mode-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f8ff;
+  color: var(--text);
+  padding: 8px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-function removeMarkFromCell(index) {
-  const cell = cells[index];
-  cell.textContent = '';
-  cell.classList.remove('o', 'x');
-  cell.disabled = false;
+.mode-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
-function removeOldestMove(mark) {
-  if (moves[mark].length === 0) return null;
-
-  const oldest = moves[mark].shift();
-  board[oldest] = '';
-  removeMarkFromCell(oldest);
-  return oldest;
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+  font-weight: 600;
 }
 
-function findImmediateWinningMove(mark, boardState = board) {
-  const available = getAvailableMoves(boardState);
-
-  for (const index of available) {
-    boardState[index] = mark;
-    const pattern = findWinningPattern(mark, boardState);
-    boardState[index] = '';
-    if (pattern) return index;
-  }
-
-  return null;
+#difficulty,
+#start-player {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  color: var(--text);
+  font-size: 0.95rem;
 }
 
-function minimax(boardState, depth, isMaximizing, aiMark, humanMark) {
-  const aiWin = findWinningPattern(aiMark, boardState);
-  const humanWin = findWinningPattern(humanMark, boardState);
-
-  if (aiWin) return 10 - depth;
-  if (humanWin) return depth - 10;
-
-  const available = getAvailableMoves(boardState);
-  if (available.length === 0) return 0;
-
-  if (isMaximizing) {
-    let bestScore = -Infinity;
-    for (const move of available) {
-      boardState[move] = aiMark;
-      const score = minimax(boardState, depth + 1, false, aiMark, humanMark);
-      boardState[move] = '';
-      bestScore = Math.max(bestScore, score);
-    }
-    return bestScore;
-  }
-
-  let bestScore = Infinity;
-  for (const move of available) {
-    boardState[move] = humanMark;
-    const score = minimax(boardState, depth + 1, true, aiMark, humanMark);
-    boardState[move] = '';
-    bestScore = Math.min(bestScore, score);
-  }
-  return bestScore;
+.scoreboard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
-function getCpuMove() {
-  const available = getAvailableMoves();
-
-  if (difficulty === 'easy') {
-    const randomIndex = Math.floor(Math.random() * available.length);
-    return available[randomIndex];
-  }
-
-  if (difficulty === 'normal') {
-    const winningMove = findImmediateWinningMove(cpuMark);
-    if (winningMove !== null) return winningMove;
-
-    const humanMark = cpuMark === 'O' ? 'X' : 'O';
-    const blockMove = findImmediateWinningMove(humanMark);
-    if (blockMove !== null) return blockMove;
-
-    if (available.includes(4)) return 4;
-
-    const corners = [0, 2, 6, 8].filter(index => available.includes(index));
-    if (corners.length > 0) return corners[0];
-
-    return available[0];
-  }
-
-  // Hard: minimax
-  let bestScore = -Infinity;
-  let bestMove = available[0];
-  const humanMark = cpuMark === 'O' ? 'X' : 'O';
-
-  for (const move of available) {
-    board[move] = cpuMark;
-    const score = minimax(board, 0, false, cpuMark, humanMark);
-    board[move] = '';
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMove = move;
-    }
-  }
-
-  return bestMove;
+.score-box {
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-function disableAll() {
-  cells.forEach(cell => cell.disabled = true);
+.score-box span {
+  font-size: 0.75rem;
+  color: #4b5563;
 }
 
-function resetGame() {
-  board = Array(9).fill('');
-  moves = { O: [], X: [] };
-  currentPlayer = 'O';
-  gameOver = false;
-  clearWinHighlight();
-
-  cells.forEach(cell => {
-    cell.textContent = '';
-    cell.classList.remove('o', 'x', 'win');
-    cell.disabled = false;
-  });
-
-  if (gameMode === 'cpu' && cpuMark === 'X') {
-    setStatus('CPU が先攻です');
-    setTimeout(() => {
-      if (!gameOver) {
-        const cpuMove = getCpuMove();
-        placeMark(cpuMove, 'X');
-      }
-    }, 500);
-    return;
-  }
-
-  setStatus('プレイヤー O の番です');
+.score-box strong {
+  font-size: 1.1rem;
 }
 
-function finalizeRound(message) {
-  setStatus(message);
-  gameOver = true;
-  disableAll();
+.history-panel {
+  margin-bottom: 18px;
+  background: #f8fbff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 10px;
 }
 
-function placeMark(index, mark) {
-  if (gameOver || board[index]) return;
-
-  board[index] = mark;
-  moves[mark].push(index);
-  addMarkToCell(index, mark);
-
-  const winningPattern = findWinningPattern(mark);
-  if (winningPattern) {
-    animateWin(winningPattern);
-    finalizeRound(`プレイヤー ${mark} の勝ちです！`);
-    return;
-  }
-
-  if (moves[mark].length >= 4) {
-    const removed = removeOldestMove(mark);
-    const nextPlayer = mark === 'O' ? 'X' : 'O';
-
-    setStatus(
-      `プレイヤー ${mark} が4つ目を入力したため、最初の入力（セル ${removed + 1}）が消えました。次はプレイヤー ${nextPlayer} の番です`
-    );
-    currentPlayer = nextPlayer;
-
-    if (gameMode === 'cpu' && currentPlayer === cpuMark) {
-      setTimeout(() => {
-        if (!gameOver) {
-          const cpuMove = getCpuMove();
-          placeMark(cpuMove, cpuMark);
-        }
-      }, 500);
-    }
-    return;
-  }
-
-  if (board.filter(Boolean).length === 9) {
-    finalizeRound('引き分けです');
-    return;
-  }
-
-  currentPlayer = mark === 'O' ? 'X' : 'O';
-  setStatus(`プレイヤー ${currentPlayer} の番です`);
-
-  if (gameMode === 'cpu' && currentPlayer === cpuMark) {
-    setTimeout(() => {
-      if (!gameOver) {
-        const cpuMove = getCpuMove();
-        placeMark(cpuMove, cpuMark);
-      }
-    }, 500);
-  }
+.history-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
 }
 
-function handleCellClick(event) {
-  const cell = event.currentTarget;
-  const idx = Number(cell.dataset.index);
-
-  if (gameOver || board[idx]) return;
-  if (gameMode === 'cpu' && currentPlayer === cpuMark) return;
-
-  placeMark(idx, currentPlayer);
+#history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-function setMode(nextMode) {
-  gameMode = nextMode;
-  cpuMark = nextMode === 'cpu' ? 'X' : 'O';
-  resetGame();
+#history-list li {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 0.85rem;
 }
 
-modeButtons.forEach(button => {
-  button.addEventListener('click', () => {
-    modeButtons.forEach(btn => btn.classList.toggle('active', btn === button));
-    setMode(button.dataset.mode);
-  });
-});
+.status {
+  margin: 0 0 18px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
 
-difficultySelect.addEventListener('change', (event) => {
-  difficulty = event.target.value;
-  resetGame();
-});
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(80px, 1fr));
+  gap: 10px;
+  margin: 0 auto 16px;
+  width: min(100%, 300px);
+}
 
-cells.forEach(cell => {
-  cell.addEventListener('click', handleCellClick);
-});
+.cell {
+  width: 100%;
+  aspect-ratio: 1;
+  font-size: clamp(2rem, 6vw, 3rem);
+  font-weight: 700;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--empty);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
 
-resetBtn.addEventListener('click', resetGame);
+.cell:focus {
+  outline: 3px solid rgba(59,130,246,0.18);
+  outline-offset: 3px;
+}
 
-setStatus('プレイヤー O の番です');
+.cell:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 6px 12px rgba(59, 130, 246, 0.12);
+}
+
+.cell:disabled {
+  cursor: default;
+}
+
+.cell.o {
+  color: var(--o-color);
+}
+
+.cell.x {
+  color: var(--x-color);
+}
+
+.cell.win {
+  animation: winPulse 0.7s ease-in-out infinite alternate;
+  border-color: var(--primary);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(59,130,246,0.12));
+  box-shadow: 0 0 0 4px var(--win-glow);
+}
+
+@keyframes winPulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.07); }
+}
+
+.reset-btn {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.reset-btn:hover {
+  background: var(--primary-dark);
+  transform: translateY(-1px);
+}
