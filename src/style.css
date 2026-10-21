@@ -74,8 +74,19 @@ h1 {
   font-weight: 600;
 }
 
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hidden {
+  display: none;
+}
+
 #difficulty,
-#start-player {
+#start-player,
+#human-mark {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 12px;
@@ -203,8 +214,12 @@ h1 {
 }
 
 @keyframes winPulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.07); }
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.07);
+  }
 }
 
 .reset-btn {
