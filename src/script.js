@@ -4,6 +4,8 @@ const resetBtn = document.getElementById('reset');
 const modeButtons = [...document.querySelectorAll('.mode-btn')];
 const difficultySelect = document.getElementById('difficulty');
 const startPlayerSelect = document.getElementById('start-player');
+const humanMarkSelect = document.getElementById('human-mark');
+const cpuMarkContainer = document.getElementById('cpu-mark-container');
 const historyList = document.getElementById('history-list');
 
 const scoreEls = {
@@ -11,6 +13,8 @@ const scoreEls = {
   X: document.getElementById('score-x'),
   draw: document.getElementById('score-draw')
 };
+
+const STORAGE_KEY = 'tictactoe-history-v1';
 
 const WIN_PATTERNS = [
   [0, 1, 2],
@@ -28,18 +32,42 @@ let moves = { O: [], X: [] };
 let currentPlayer = 'O';
 let gameOver = false;
 let gameMode = 'pvp';
-let cpuMark = 'X';
 let difficulty = 'normal';
 let score = { O: 0, X: 0, draw: 0 };
 let history = [];
-
+let humanMark = 'X';
+let cpuMark = 'O';
 let audioCtx = null;
 
-function initAudio() {
-  if (!audioCtx) {
-    const AudioCtor = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtor) audioCtx = new AudioCtor();
+function loadPersistentState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    if (parsed.score) {
+      score = { ...score, ...parsed.score };
+    }
+    if (Array.isArray(parsed.history)) {
+      history = parsed.history.slice(0, 20);
+    }
+  } catch (error) {
+    console.warn('状態の読み込みに失敗しました:', error);
   }
+}
+
+function savePersistentState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ score, history }));
+  } catch (error) {
+    console.warn('状態の保存に失敗しました:', error);
+  }
+}
+
+function initAudio() {
+  const AudioCtor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtor) return;
+  audioCtx = new AudioCtor();
 }
 
 function playTone(frequency, duration = 0.12, type = 'square', volume = 0.04) {
@@ -77,29 +105,37 @@ function playDrawSound() {
   playTone(350, 0.2, 'sawtooth', 0.04);
 }
 
-function updateStartPlayerOptions() {
-  if (gameMode === 'cpu') {
-    startPlayerSelect.innerHTML = `
-      <option value="human">あなた</option>
-      <option value="cpu">CPU</option>
-    `;
-    startPlayerSelect.value = 'human';
-  } else {
-    startPlayerSelect.innerHTML = `
-      <option value="O" selected>O</option>
-      <option value="X">X</option>
-    `;
-    startPlayerSelect.value = 'O';
-  }
-}
-
 function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function renderScoreboard() {
+  scoreEls.O.textContent = String(score.O);
+  scoreEls.X.textContent = String(score.X);
+  scoreEls.draw.textContent = String(score.draw);
+}
+
+function renderHistory() {
+  historyList.innerHTML = '';
+  history.forEach(entry => {
+    const li = document.createElement('li');
+    li.textContent = entry;
+    historyList.appendChild(li);
+  });
+}
+
+function addHistory(entry) {
+  history.unshift(entry);
+  history = history.slice(0, 12);
+  savePersistentState();
+  renderHistory();
+}
+
 function findWinningPattern(mark, boardState = board) {
   for (const pattern of WIN_PATTERNS) {
-    if (pattern.every(index => boardState[index] === mark)) return pattern;
+    if (pattern.every(index => boardState[index] === mark)) {
+      return pattern;
+    }
   }
   return null;
 }
@@ -204,8 +240,8 @@ function getCpuMove() {
     const winningMove = findImmediateWinningMove(cpuMark);
     if (winningMove !== null) return winningMove;
 
-    const humanMark = cpuMark === 'O' ? 'X' : 'O';
-    const blockMove = findImmediateWinningMove(humanMark);
+    const opponentMark = cpuMark === 'O' ? 'X' : 'O';
+    const blockMove = findImmediateWinningMove(opponentMark);
     if (blockMove !== null) return blockMove;
 
     if (available.includes(4)) return 4;
@@ -216,14 +252,13 @@ function getCpuMove() {
     return available[0];
   }
 
-  // Hard: minimax
   let bestScore = -Infinity;
   let bestMove = available[0];
-  const humanMark = cpuMark === 'O' ? 'X' : 'O';
+  const opponentMark = cpuMark === 'O' ? 'X' : 'O';
 
   for (const move of available) {
     board[move] = cpuMark;
-    const score = minimax(board, 0, false, cpuMark, humanMark);
+    const score = minimax(board, 0, false, cpuMark, opponentMark);
     board[move] = '';
 
     if (score > bestScore) {
@@ -235,25 +270,39 @@ function getCpuMove() {
   return bestMove;
 }
 
-function renderScoreboard() {
-  scoreEls.O.textContent = String(score.O);
-  scoreEls.X.textContent = String(score.X);
-  scoreEls.draw.textContent = String(score.draw);
+function disableAll() {
+  cells.forEach(cell => cell.disabled = true);
 }
 
-function addHistory(text) {
-  const li = document.createElement('li');
-  li.textContent = text;
-  historyList.prepend(li);
-  if (historyList.children.length > 8) {
-    historyList.removeChild(historyList.lastChild);
+function updateStartPlayerOptions() {
+  if (gameMode === 'cpu') {
+    startPlayerSelect.innerHTML = `
+      <option value="human" selected>あなた</option>
+      <option value="cpu">CPU</option>
+    `;
+    startPlayerSelect.value = 'human';
+    cpuMarkContainer.classList.remove('hidden');
+  } else {
+    startPlayerSelect.innerHTML = `
+      <option value="O" selected>O</option>
+      <option value="X">X</option>
+    `;
+    startPlayerSelect.value = 'O';
+    cpuMarkContainer.classList.add('hidden');
   }
+}
+
+function syncCpuMarks() {
+  if (gameMode !== 'cpu') return;
+
+  const chosenHumanMark = humanMarkSelect.value;
+  humanMark = chosenHumanMark;
+  cpuMark = chosenHumanMark === 'X' ? 'O' : 'X';
 }
 
 function resetBoard() {
   board = Array(9).fill('');
   moves = { O: [], X: [] };
-  currentPlayer = 'O';
   gameOver = false;
   clearWinHighlight();
 
@@ -264,17 +313,20 @@ function resetBoard() {
   });
 
   if (gameMode === 'cpu') {
-    const selected = startPlayerSelect.value;
-    currentPlayer = selected === 'cpu' ? 'X' : 'O';
-    setStatus(currentPlayer === 'X' ? 'CPU の番です' : 'プレイヤー O の番です');
+    syncCpuMarks();
 
-    if (currentPlayer === 'X') {
+    const selectedFirst = startPlayerSelect.value;
+    currentPlayer = selectedFirst === 'cpu' ? cpuMark : humanMark;
+
+    setStatus(currentPlayer === cpuMark ? 'CPU の番です' : 'あなたの番です');
+
+    if (currentPlayer === cpuMark) {
       setTimeout(() => {
         if (!gameOver) {
           const cpuMove = getCpuMove();
-          placeMark(cpuMove, 'X');
+          placeMark(cpuMove, cpuMark);
         }
-      }, 400);
+      }, 450);
     }
     return;
   }
@@ -284,14 +336,11 @@ function resetBoard() {
   setStatus(`プレイヤー ${currentPlayer} の番です`);
 }
 
-function finalizeRound(resultText) {
-  setStatus(resultText);
+function finalizeRound(message) {
+  setStatus(message);
   gameOver = true;
   disableAll();
-}
-
-function disableAll() {
-  cells.forEach(cell => cell.disabled = true);
+  savePersistentState();
 }
 
 function placeMark(index, mark) {
@@ -351,7 +400,7 @@ function placeMark(index, mark) {
         const cpuMove = getCpuMove();
         placeMark(cpuMove, cpuMark);
       }
-    }, 500);
+    }, 450);
     return;
   }
 
@@ -360,29 +409,17 @@ function placeMark(index, mark) {
 
 function handleCellClick(event) {
   const cell = event.currentTarget;
-  const idx = Number(cell.dataset.index);
+  const index = Number(cell.dataset.index);
 
-  if (gameOver || board[idx]) return;
-
+  if (gameOver || board[index]) return;
   if (gameMode === 'cpu' && currentPlayer === cpuMark) return;
 
-  placeMark(idx, currentPlayer);
+  placeMark(index, currentPlayer);
 }
 
 function setMode(nextMode) {
   gameMode = nextMode;
-  cpuMark = 'X';
-
   updateStartPlayerOptions();
-  resetBoard();
-}
-
-function onDifficultyChange(event) {
-  difficulty = event.target.value;
-  resetBoard();
-}
-
-function onStartPlayerChange() {
   resetBoard();
 }
 
@@ -393,12 +430,28 @@ modeButtons.forEach(button => {
   });
 });
 
-difficultySelect.addEventListener('change', onDifficultyChange);
-startPlayerSelect.addEventListener('change', onStartPlayerChange);
+difficultySelect.addEventListener('change', event => {
+  difficulty = event.target.value;
+  resetBoard();
+});
 
-cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+startPlayerSelect.addEventListener('change', () => {
+  resetBoard();
+});
+
+humanMarkSelect.addEventListener('change', () => {
+  syncCpuMarks();
+  resetBoard();
+});
+
+cells.forEach(cell => {
+  cell.addEventListener('click', handleCellClick);
+});
+
 resetBtn.addEventListener('click', resetBoard);
 
+loadPersistentState();
 renderScoreboard();
+renderHistory();
 updateStartPlayerOptions();
 resetBoard();
